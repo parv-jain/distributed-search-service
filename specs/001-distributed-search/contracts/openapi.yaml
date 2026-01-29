@@ -1,0 +1,163 @@
+openapi: 3.0.0
+info:
+  title: Distributed Search Service API
+  version: 1.0.0
+  description: API for distributed document search with multi-tenancy.
+servers:
+  - url: http://localhost:3000
+    description: Local Development
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key mapped to a Tenant.
+  schemas:
+    Document:
+      type: object
+      required:
+        - content
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        content:
+          type: object
+          description: The JSON content to index
+        metadata:
+          type: object
+          description: Optional metadata
+    SearchResults:
+      type: object
+      properties:
+        total:
+          type: integer
+        took_ms:
+          type: integer
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        dependencies:
+          type: object
+          properties:
+            redis:
+              type: string
+              enum: [up, down]
+            elasticsearch:
+              type: string
+              enum: [up, down]
+            kafka:
+              type: string
+              enum: [up, down]
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      security: []
+      operationId: checkHealth
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: System is down
+
+  /v1/documents:
+    post:
+      summary: Index a new document
+      operationId: ingestDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Document'
+      responses:
+        '202':
+          description: Document accepted for processing
+        '400':
+          description: Invalid input
+        '401':
+          description: Invalid API Key
+        '429':
+          description: Rate limit exceeded
+
+  /v1/documents/{id}:
+    get:
+      summary: Retrieve document details
+      operationId: getDocument
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          description: Document not found
+        '401':
+          description: Unauthorized
+
+    delete:
+      summary: Remove a document
+      operationId: deleteDocument
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        '204':
+          description: Document removed
+        '404':
+          description: Document not found
+        '401':
+          description: Unauthorized
+
+  /v1/search:
+    get:
+      summary: Search documents
+      operationId: searchDocuments
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+            required: true
+            description: Keyword search query
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limit exceeded

@@ -1,0 +1,9 @@
+node_modules/
+.git/
+Dockerfile*
+docker-compose*
+*.md
+specs/
+.specify/
+.gitignore
+.dockerignore
